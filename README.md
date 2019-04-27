@@ -1,4 +1,4 @@
-# jenkins-dind-build-slave
+# jenkins-dind-build-image
 
 This docker image is a DIND made to be used as a jenkins build slave to create other docker images programatically.
 
