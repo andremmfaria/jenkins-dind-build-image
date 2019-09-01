@@ -1,38 +1,21 @@
-# jenkins-dind-build-image
+# linux-dind-build-image
 
-This docker image is a DIND made to be used as a jenkins build slave to create other docker images programatically.
+This docker image is a DIND made to be used as a build slave to create other docker images programatically by an orchestrator. E.g. jenkins, GoCd, etc.
 
-As the container orchestration world rises there is a need to create containerized applications on the fly, this image facilitates this process.
+As the container orchestration world rises there is a need to create containerized applications on the fly, this image eases this process.
 
 ## Usage
 
-The jenkins instance creates and connects to this instance via SSH. However this can be achieved by user/password combination or public/private keys configuration. 
+The orchestrator instance creates and connects to this instance via SSH over user/password combination.
 
 ### User/Password:
 
 The image is already configured to use user and passord as follows:
 
 ```
-usr: jenkins
-psw: jenkins
+usr: root
+psw: lJe2u2P+iMk0lyCNHsEM39Sxe0+0R+x6Urkdhno5ffw=
 ```
-
-### Public/private keys:
-
-You need only to change this line on the Dockerfile:
-
-from:
-```
--e 's/#PasswordAuthentication.*/PasswordAuthentication yes/' \
-```
-
-to:
-```
--e 's/#PasswordAuthentication.*/PasswordAuthentication no/' \
-```
-
-And configure the private key credentials on your jenkins
-Obs: This disables the user/password config
 
 ## Thanks
 

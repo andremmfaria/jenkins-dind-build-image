@@ -1,42 +1,53 @@
 FROM docker:dind
 LABEL MAINTAINER="Andre Faria<andremarcalfaria@gmail.com>"
 
-ARG user=jenkins
-ARG group=jenkins
-ARG uid=1000
-ARG gid=1000
-ARG JENKINS_AGENT_HOME=/home/${user}
+ENV GENERIC_SONAR_SCANNER_VERSION=3.3.0.1492 \
+    GENERIC_SONAR_SCANNER_HOME=/opt/generic-sonar-scanner \
+    DOTNET_SONAR_SCANNER_VERSION=4.6.2.2108 \
+    DOTNET_SONAR_SCANNER_HOME=/opt/dotnet-sonar-scanner 
 
-ENV JENKINS_AGENT_HOME ${JENKINS_AGENT_HOME}
+ENV DOTNET_SONAR_SCANNER_DLL=${DOTNET_SONAR_SCANNER_HOME}/SonarScanner.MSBuild.dll \
+    PATH=$PATH:${GENERIC_SONAR_SCANNER_HOME}/bin
 
-# setup SSH server
+# Install necessary packages
 RUN apk update && \
-    apk add --no-cache sudo bash nss openjdk8 openssh git curl wget
+    apk add --no-cache bash nss openjdk8 openssh git curl wget unzip
+
+# Configure SSHd
 RUN sed -i /etc/ssh/sshd_config \
-        -e 's/#PermitRootLogin.*/PermitRootLogin no/' \
+        -e 's/#PermitRootLogin.*/PermitRootLogin yes/' \
         -e 's/#RSAAuthentication.*/RSAAuthentication yes/'  \
         -e 's/#PasswordAuthentication.*/PasswordAuthentication yes/' \
         -e 's/#SyslogFacility.*/SyslogFacility AUTH/' \
         -e 's/#LogLevel.*/LogLevel INFO/' && \
     mkdir /var/run/sshd && \
-    echo "%${group} ALL=(ALL) NOPASSWD: /usr/local/bin/docker" >> /etc/sudoers
+    echo "root:lJe2u2P+iMk0lyCNHsEM39Sxe0+0R+x6Urkdhno5ffw=" | chpasswd
 
-# Add user and group jenkins to the image, change it's password and create m2 folder
-RUN addgroup -g ${gid} ${group} && \
-    adduser -D -h "${JENKINS_AGENT_HOME}" -u "${uid}" -G "${group}" -s /bin/bash "${user}" && \
-    echo "jenkins:jenkins" | chpasswd
+# Install Sonar-Scanner
+RUN mkdir /tmp/tempdownload && \
+    curl -o /tmp/tempdownload/scanner.zip -L https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${GENERIC_SONAR_SCANNER_VERSION}-linux.zip && \
+    unzip /tmp/tempdownload/scanner.zip -d /tmp/tempdownload && \
+    mv /tmp/tempdownload/$(ls /tmp/tempdownload | grep sonar-scanner) ${GENERIC_SONAR_SCANNER_HOME} && \
+    sed -i 's/use_embedded_jre=true/use_embedded_jre=false/g' ${GENERIC_SONAR_SCANNER_HOME}/bin/sonar-scanner && \
+    ln -s ${GENERIC_SONAR_SCANNER_HOME}/bin/sonar-scanner /usr/bin/sonar-scanner && \
+    rm -rf /tmp/tempdownload
 
-#Update credential for Jenkins user
+# Install .net core sonar scanner
+RUN mkdir /opt/dotnet-sonar-scanner && \
+    curl -o ${DOTNET_SONAR_SCANNER_HOME}/scanner.zip -L https://github.com/SonarSource/sonar-scanner-msbuild/releases/download/${DOTNET_SONAR_SCANNER_VERSION}/sonar-scanner-msbuild-${DOTNET_SONAR_SCANNER_VERSION}-netcoreapp2.0.zip && \
+    unzip ${DOTNET_SONAR_SCANNER_HOME}/scanner.zip -d ${DOTNET_SONAR_SCANNER_HOME} && \
+    chmod +x -R ${DOTNET_SONAR_SCANNER_HOME} && \
+    rm -rf ${DOTNET_SONAR_SCANNER_HOME}/scanner.zip
+
+# Configure stuff
 RUN delgroup ping && \
-    addgroup -g 999 docker && \
-    addgroup jenkins docker && \
-    ln -s /usr/local/bin/docker /usr/bin/docker
+    ln -s /usr/local/bin/docker /usr/bin/docker && \
+    sed -i /etc/passwd -e '/root/s/ash/bash/g'
 
-VOLUME "${JENKINS_AGENT_HOME}" "/tmp" "/run" "/var/run"
-WORKDIR "${JENKINS_AGENT_HOME}"
+WORKDIR "/root"
 
-COPY entrypoint "${JENKINS_AGENT_HOME}/entrypoint"
+COPY entrypoint.sh "/root/entrypoint.sh"
 
 EXPOSE 22
 
-ENTRYPOINT ["bash","entrypoint"]
+ENTRYPOINT ["bash","entrypoint.sh"]
